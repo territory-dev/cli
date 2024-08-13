@@ -5,6 +5,7 @@ build-backend = "flit_core.buildapi"
 [project]
 name = "territory"
 dynamic = ["version", "description"]
+authors = [{name = "Paweł Z. Stiasny", email = "pawel@territory.dev"}]
 dependencies = [
     "requests >= 2.32.3, <3",
     "platformdirs >= 4.2.2, <5",
@@ -14,6 +15,10 @@ test = [
     "pytest >= 8.2.2, <9",
     "Flask >= 3.0.3, <4",
 ]
+
+[project.urls]
+Home = "https://territory.dev"
+Source = "https://github.com/territory-dev/cli"
 
 [project.scripts]
 territory = "territory:main"
