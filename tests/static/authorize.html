@@ -1,0 +1,18 @@
+<!doctype html>
+
+<script>
+    const u = URL.parse(window.location.href)
+    const cb = u.searchParams.get('callback')
+    const postBody = {
+        upload_token: 'testtoken',
+    }
+    if (cb)  {
+        fetch(cb, {method: 'POST', body: JSON.stringify(postBody)}).then((resp) => {
+            console.log(resp.status)
+
+            const el = document.createElement('div')
+            el.innerText = 'Authorization successful. You can now close this tab.'
+            document.body.appendChild(el)
+        })
+    }
+</script>

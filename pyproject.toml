@@ -1,0 +1,19 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "territory"
+dynamic = ["version", "description"]
+dependencies = [
+    "requests >= 2.32.3, <3",
+    "platformdirs >= 4.2.2, <5",
+]
+[project.optional-dependencies]
+test = [
+    "pytest >= 8.2.2, <9",
+    "Flask >= 3.0.3, <4",
+]
+
+[project.scripts]
+territory = "territory:main"
