@@ -1,5 +1,5 @@
 '''Client for territory.dev'''
-__version__ = '1.0'
+__version__ = '1.0.1'
 
 
 from argparse import ArgumentParser
@@ -7,7 +7,7 @@ from hashlib import blake2b
 import json
 import logging
 from pathlib import Path
-from subprocess import check_output
+from subprocess import check_output, run
 from tempfile import TemporaryDirectory
 import os
 from socket import gethostname
@@ -240,26 +240,41 @@ def _query_dependencies(cc_dir: Path, tmp_dir: Path, compilation_command):
     else:
         arguments = compilation_command['arguments']
 
-    if '-c' in arguments:
-        arguments.remove('-c')
-    if fi := arguments.index('-o'):
+    args_to_remove = ['-c', '-MMD']
+    for arg in args_to_remove:
+        try:
+            arguments.remove(arg)
+        except ValueError:
+            pass
+
+    args_with_paths_to_remove = ['-o', '-MF']
+    for arg in args_with_paths_to_remove:
+        try:
+            fi = arguments.index(arg)
+        except ValueError:
+            continue
+
         arguments = arguments[0:fi] + arguments[fi+2:]
 
     deps_dir = tmp_dir / 'deps'
     deps_dir.mkdir(parents=True, exist_ok=True)
     out_file = deps_dir / blake2b(compilation_command['file'].encode()).hexdigest()
 
-    arguments = [arguments[0], '-E', '-MD', '-MF' + str(out_file), *arguments[1:]]
-    check_output(arguments, cwd=compilation_command.get('directory') or cc_dir)
+    arguments = [arguments[0], '-E', '-MD', '-MF' + str(out_file), *arguments[1:], '-o', '/dev/null']
+    run(arguments, cwd=compilation_command.get('directory') or cc_dir)
 
-    deps_text = out_file.read_text()
-    _target, deps = deps_text.split(':', 1)
-    lines = [l.rstrip('\\') for l in deps.splitlines()]
-    files = shlex.split(' '.join(lines))
+    if out_file.exists():
+        deps_text = out_file.read_text()
+        _target, deps = deps_text.split(':', 1)
+        lines = [l.rstrip('\\') for l in deps.splitlines()]
+        files = shlex.split(' '.join(lines))
 
-    dir_ = compilation_command.get('directory') or cc_dir
+        dir_ = compilation_command.get('directory') or cc_dir
 
-    return {Path(dir_, f).resolve() for f in files}
+        return {Path(dir_, f).resolve() for f in files}
+    else:
+        print('no dependencies recorded for', compilation_command['file'])
+        return set()
 
 
 def _list_repo_files(dir):
