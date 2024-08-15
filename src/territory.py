@@ -4,22 +4,25 @@ __version__ = '1.0.1'
 
 from argparse import ArgumentParser
 from hashlib import blake2b
-import json
-import logging
 from pathlib import Path
+from socket import gethostname
 from subprocess import check_output, run
 from tempfile import TemporaryDirectory
+from urllib.parse import urlencode, urlparse
+import http.server
+import json
+import logging
 import os
-from socket import gethostname
 import shlex
 import tarfile
 import threading
 import webbrowser
-from urllib.parse import urlencode, urlparse
-import http.server
 
 from platformdirs import user_config_path
 import requests
+import tqdm
+
+DEFAULT_UPLOAD_TOKEN_PATH = user_config_path('Territory') / 'upload_token'
 
 
 def main(argv=None):
@@ -54,7 +57,6 @@ def upload(args, cwd):
         tfl.write_text(repo_files)
         captured_files.update(Path(cwd, p) for p in repo_files.split('\n'))
 
-        print('collecting dependencies from sources')
         cc_files = _collect_from_compilation_database(td, compile_commands_dir)
         captured_files.update(cc_files)
 
@@ -64,7 +66,6 @@ def upload(args, cwd):
                 if repo_root in path.parents
             }
 
-        print('compressing')
         if args.tarball_only:
             tarball_in = repo_root
         else:
@@ -72,7 +73,7 @@ def upload(args, cwd):
         tarball_path = Path(tarball_in, 'territory_upload.tar.gz')
         with tarfile.open(tarball_path, 'w:gz') as output:
             output.add(tfl, arcname=repo_root / 'TERRITORY_FILE_LISTING')
-            for path in captured_files:
+            for path in tqdm.tqdm(captured_files, 'compressing'):
                 output.add(path)
 
         if args.tarball_only:
@@ -188,8 +189,11 @@ def _acquire_token():
             upload_token_received.set()
 
 
+    print('We will start a local HTTP server and open the web browser now.')
+    print('If a web browser is not available, create an upload token manually and')
+    print(f'store it in {DEFAULT_UPLOAD_TOKEN_PATH}');
     s = http.server.HTTPServer(('localhost', 0), Handler)
-    print('serving on ', s.server_port)
+    print('serving on', s.server_port)
     open_authorizer({
         'callback': f'http://localhost:{s.server_port}',
         'display_name': gethostname(),
@@ -224,7 +228,7 @@ def _collect_from_compilation_database(tmp_dir, cc_dir):
         cc_data = json.load(f)
 
     result = { cc_path }
-    for cmd in cc_data:
+    for cmd in tqdm.tqdm(cc_data, 'collecting dependencies from sources'):
         dir_ = cmd.get('directory') or cc_dir
         p = Path(dir_, cmd['file'])
         result.add(p)
@@ -265,6 +269,7 @@ def _query_dependencies(cc_dir: Path, tmp_dir: Path, compilation_command):
 
     if out_file.exists():
         deps_text = out_file.read_text()
+        out_file.unlink()
         _target, deps = deps_text.split(':', 1)
         lines = [l.rstrip('\\') for l in deps.splitlines()]
         files = shlex.split(' '.join(lines))
@@ -316,17 +321,17 @@ sp.set_defaults(func=upload)
 sp.add_argument(
     '--upload-token-path',
     type=Path,
-    default=user_config_path('Territory') / 'upload_token')
+    default=DEFAULT_UPLOAD_TOKEN_PATH)
+sp.add_argument(
+    '--system',
+    action='store_true',
+    help='collect system-wide dependencies')
 repo_or_tarball = sp.add_mutually_exclusive_group(required=True)
 repo_or_tarball.add_argument('--repo-id')
 repo_or_tarball.add_argument(
     '--tarball-only',
     action='store_true',
     help='do not upload, create territory_upload.tar.gz output only')
-repo_or_tarball.add_argument(
-    '--system',
-    action='store_true',
-    help='collect system-wide dependencies')
 
 
 if __name__ == '__main__':

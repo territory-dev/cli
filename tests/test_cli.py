@@ -78,7 +78,7 @@ class ApiMock:
         self.len = None
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def mock_authserver():
     app = Flask(__name__)
     api = ApiMock()

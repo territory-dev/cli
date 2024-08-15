@@ -9,6 +9,7 @@ authors = [{name = "Paweł Z. Stiasny", email = "pawel@territory.dev"}]
 dependencies = [
     "requests >= 2.32.3, <3",
     "platformdirs >= 4.2.2, <5",
+    "tqdm >= 4.66.5, <5",
 ]
 [project.optional-dependencies]
 test = [
