@@ -1,9 +1,11 @@
 '''Client for territory.dev'''
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 
 from argparse import ArgumentParser
 from hashlib import blake2b
+from multiprocessing import cpu_count
+from multiprocessing.pool import Pool
 from pathlib import Path
 from socket import gethostname
 from subprocess import check_output, run
@@ -227,13 +229,28 @@ def _collect_from_compilation_database(tmp_dir, cc_dir):
     with cc_path.open('r') as f:
         cc_data = json.load(f)
 
-    result = { cc_path }
-    for cmd in tqdm.tqdm(cc_data, 'collecting dependencies from sources'):
-        dir_ = cmd.get('directory') or cc_dir
-        p = Path(dir_, cmd['file'])
-        result.add(p)
-        d = _query_dependencies(cc_dir, tmp_dir, cmd)
-        result.update(d)
+    with \
+            Pool(cpu_count() * 2) as tpool, \
+            tqdm.tqdm(total=len(cc_data), desc='collecting dependencies from sources') as progr:
+        result = { cc_path }
+        def _cb(paths):
+            result.update(paths)
+            progr.update(1)
+        def _ecb(e):
+            print('error:', e)
+            progr.update(1)
+        for cmd in cc_data:
+            dir_ = cmd.get('directory') or cc_dir
+            p = Path(dir_, cmd['file'])
+            result.add(p)
+            tpool.apply_async(
+                _query_dependencies,
+                (cc_dir, tmp_dir, cmd),
+                {},
+                callback=_cb,
+                error_callback=_ecb)
+        tpool.close()
+        tpool.join()
 
     return result
 
