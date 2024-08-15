@@ -76,6 +76,9 @@ def upload(args, cwd):
         with tarfile.open(tarball_path, 'w:gz') as output:
             output.add(tfl, arcname=repo_root / 'TERRITORY_FILE_LISTING')
             for path in tqdm.tqdm(captured_files, 'compressing'):
+                if not path.exists():
+                    print('missing file:', path)
+                    continue
                 output.add(path)
 
         if args.tarball_only:
