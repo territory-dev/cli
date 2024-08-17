@@ -1,5 +1,5 @@
 '''Client for territory.dev'''
-__version__ = '1.1'
+__version__ = '1.1.1'
 
 
 from argparse import ArgumentParser
@@ -108,6 +108,9 @@ def upload(args, cwd):
         with tarball_path.open('rb') as f:
             resp = requests.put(intent['url'], data=f, headers=intent['extensionHeaders'])
         resp.raise_for_status()
+
+    if args.repo_id:
+        print(f'Indexing will begin shortly. You can track build status at <https://app.territory.dev/repos/{args.repo_id}/jobs>.')
 
 
 def add_path_to_archive(archive: tarfile.TarFile, path: Path):
