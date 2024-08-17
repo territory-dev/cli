@@ -36,7 +36,7 @@ def main(argv=None):
         requests_log.setLevel(logging.DEBUG)
         requests_log.propagate = True
 
-    cwd = args.C or Path.cwd()
+    cwd = (args.C or Path.cwd()).resolve()
     args.func(args, cwd)
 
 
@@ -79,7 +79,7 @@ def upload(args, cwd):
                 if not path.exists():
                     print('missing file:', path)
                     continue
-                output.add(path)
+                add_path_to_archive(output, path)
 
         if args.tarball_only:
             print('created', tarball_path)
@@ -103,6 +103,24 @@ def upload(args, cwd):
         with tarball_path.open('rb') as f:
             resp = requests.put(intent['url'], data=f, headers=intent['extensionHeaders'])
         resp.raise_for_status()
+
+
+def add_path_to_archive(archive: tarfile.TarFile, path: Path):
+    stk = list(path.parts)
+    i = 1
+    while i <= len(stk):
+        p = Path(*stk[:i])
+        if stk[i-1] == '..':
+            stk[i-2 : i] = []
+            i -= 1
+        elif p.is_symlink():
+            archive.add(p)
+            lp = list(p.readlink().parts)
+            stk[i-1:i] = lp
+            i -= 1
+        elif p.is_file():
+            archive.add(p)
+        i += 1
 
 
 def _create_build_request(upload_token, repo_id, branch, meta, blob_size):
@@ -296,7 +314,7 @@ def _query_dependencies(cc_dir: Path, tmp_dir: Path, compilation_command):
 
         dir_ = compilation_command.get('directory') or cc_dir
 
-        return {Path(dir_, f).resolve() for f in files}
+        return {Path(dir_, f) for f in files}
     else:
         print('no dependencies recorded for', compilation_command['file'])
         return set()
