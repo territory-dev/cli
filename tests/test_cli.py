@@ -1,19 +1,17 @@
 from io import BytesIO
 from pathlib import Path
-from subprocess import check_call
 from threading import Thread
 from unittest.mock import ANY
 from wsgiref.simple_server import make_server
-import json
 import tarfile
 
 from flask import Flask, request
 import pytest
 
 from territory import main
+from territory_testlib import init_repo
 
 
-EXAMPLE_REPO_DIR = Path(__file__).parent / 'repo'
 AUTHORIZER_DIR = Path(__file__).parent / 'authorizer'
 
 TEST_REPO_EXPECTED_FILES = [
@@ -97,6 +95,7 @@ def mock_authserver():
                 'commit_message': 'initial commit\n\n',
                 'repo_root': ANY,
                 'compile_commands_dir': ANY,
+                'index_system': False,
             },
         }
 
@@ -127,23 +126,3 @@ def mock_authserver():
     yield api
 
     server.shutdown()
-
-
-def init_repo(test_repo_dir):
-    check_call(['cp', '-R', EXAMPLE_REPO_DIR, test_repo_dir])
-    check_call(['git', 'init', '-b', 'main', test_repo_dir])
-    check_call(['git', '-C', test_repo_dir, 'add', 'mod1.c', 'dir/mod2.c', 'Makefile'])
-    check_call(['git', '-C', test_repo_dir, 'commit', '-m', 'initial commit'])
-    (test_repo_dir / 'compile_commands.json').write_text(json.dumps([
-        {
-            'command': f'clang -c -o mod1.o {test_repo_dir}/mod1.c',
-            'directory': str(test_repo_dir),
-            'file': f'{test_repo_dir}/mod1.c'
-        },
-        {
-            'command': f'clang -c -o mod2.o {test_repo_dir}/dir/mod2.c',
-            'directory': str(test_repo_dir),
-            'file': f'{test_repo_dir}/dir/mod2.c'
-        },
-    ]))
-

@@ -1,5 +1,5 @@
 '''Client for territory.dev'''
-__version__ = '1.0.3'
+__version__ = '1.1'
 
 
 from argparse import ArgumentParser
@@ -8,14 +8,16 @@ from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
 from pathlib import Path
 from socket import gethostname
-from subprocess import check_output, run
+from subprocess import PIPE, STDOUT, check_output, run
 from tempfile import TemporaryDirectory
 from urllib.parse import urlencode, urlparse
 import http.server
 import json
 import logging
 import os
+import re
 import shlex
+from sys import exit
 import tarfile
 import threading
 import webbrowser
@@ -59,14 +61,15 @@ def upload(args, cwd):
         tfl.write_text(repo_files)
         captured_files.update(Path(cwd, p) for p in repo_files.split('\n'))
 
-        cc_files = _collect_from_compilation_database(td, compile_commands_dir)
-        captured_files.update(cc_files)
+        cc_path = compile_commands_dir / 'compile_commands.json'
+        cc_data = read_compile_commands(cc_path)
+        set_compiler_targets(cc_data)
+        gen_ccs_path = Path(td, 'compile_commands.json')
+        with gen_ccs_path.open('w') as f:
+            json.dump(cc_data, f, indent=4)
 
-        if not args.system:
-            captured_files = {
-                path for path in captured_files
-                if repo_root in path.parents
-            }
+        cc_files = _collect_from_compilation_database(td, compile_commands_dir, cc_data)
+        captured_files.update(cc_files)
 
         if args.tarball_only:
             tarball_in = repo_root
@@ -75,6 +78,7 @@ def upload(args, cwd):
         tarball_path = Path(tarball_in, 'territory_upload.tar.gz')
         with tarfile.open(tarball_path, 'w:gz') as output:
             output.add(tfl, arcname=repo_root / 'TERRITORY_FILE_LISTING')
+            output.add(gen_ccs_path, arcname=cc_path)
             for path in tqdm.tqdm(captured_files, 'compressing'):
                 if not path.exists():
                     print('missing file:', path)
@@ -92,6 +96,7 @@ def upload(args, cwd):
             'commit_message': _get_commit_message(repo_root),
             'repo_root': str(repo_root),
             'compile_commands_dir': str(compile_commands_dir),
+            'index_system': args.system,
         }
 
         print('registering build request')
@@ -106,6 +111,7 @@ def upload(args, cwd):
 
 
 def add_path_to_archive(archive: tarfile.TarFile, path: Path):
+    '''Adds a file to archive, ensuring symlinks are preserved and paths normalized'''
     stk = list(path.parts)
     i = 1
     while i <= len(stk):
@@ -137,6 +143,8 @@ def _create_build_request(upload_token, repo_id, branch, meta, blob_size):
             'Authorization': f'bearer {upload_token}',
             'User-Agent': f'territory/{__version__}',
         })
+    if response.status_code == 429:
+        exit(response.text)
     response.raise_for_status()
     return response.json()
 
@@ -245,15 +253,44 @@ def _find_compile_commands_dir(p):
         raise SystemExit('no compile_commands.json found')
 
 
-def _collect_from_compilation_database(tmp_dir, cc_dir):
-    cc_path = cc_dir / 'compile_commands.json'
+def read_compile_commands(cc_path):
     with cc_path.open('r') as f:
         cc_data = json.load(f)
 
+    for cc in cc_data:
+        if cmd_str := cc.pop('command'):
+            cc['arguments'] = shlex.split(cmd_str)
+
+    return cc_data
+
+def set_compiler_targets(cc_data: list[dict]):
+    '''Adds explicit -target argument to compile commands'''
+    compilers = {cc['arguments'][0]: _get_cc_target(cc['arguments'][0]) for cc in cc_data}
+    for cc in cc_data:
+        args: list[str] = cc['arguments']
+        if '-target' in args:
+            continue
+        target = compilers[args[0]]
+        if not target:
+            continue
+        args[1:1] = ['-target', target]
+
+
+def _get_cc_target(compiler_bin) -> str | None:
+    out = check_output([compiler_bin, '-v'], stderr=STDOUT, text=True)
+    lines = out.splitlines()
+    for l in lines:
+        m = re.match('^Target: (.+)$', l)
+        if m:
+            return m.group(1)
+    return None
+
+
+def _collect_from_compilation_database(tmp_dir, cc_dir, cc_data):
     with \
-            Pool(cpu_count() * 2) as tpool, \
+            Pool(cpu_count() * 2) as pool, \
             tqdm.tqdm(total=len(cc_data), desc='collecting dependencies from sources') as progr:
-        result = { cc_path }
+        result = set()
         def _cb(paths):
             result.update(paths)
             progr.update(1)
@@ -264,23 +301,20 @@ def _collect_from_compilation_database(tmp_dir, cc_dir):
             dir_ = cmd.get('directory') or cc_dir
             p = Path(dir_, cmd['file'])
             result.add(p)
-            tpool.apply_async(
+            pool.apply_async(
                 _query_dependencies,
                 (cc_dir, tmp_dir, cmd),
                 {},
                 callback=_cb,
                 error_callback=_ecb)
-        tpool.close()
-        tpool.join()
+        pool.close()
+        pool.join()
 
     return result
 
 
 def _query_dependencies(cc_dir: Path, tmp_dir: Path, compilation_command):
-    if 'command' in compilation_command:
-        arguments = shlex.split(compilation_command['command'])
-    else:
-        arguments = compilation_command['arguments']
+    arguments = compilation_command['arguments'][:]
 
     args_to_remove = ['-c', '-MMD']
     for arg in args_to_remove:
