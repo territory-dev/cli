@@ -6,6 +6,7 @@ build-backend = "flit_core.buildapi"
 name = "territory"
 dynamic = ["version", "description"]
 authors = [{name = "Paweł Z. Stiasny", email = "pawel@territory.dev"}]
+readme = "README.md"
 dependencies = [
     "requests >= 2.32.3, <3",
     "platformdirs >= 4.2.2, <5",

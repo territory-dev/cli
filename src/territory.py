@@ -1,5 +1,5 @@
 '''Client for territory.dev'''
-__version__ = '1.1.1'
+__version__ = '1.1.2'
 
 
 from argparse import ArgumentParser
@@ -266,6 +266,7 @@ def read_compile_commands(cc_path):
 
     return cc_data
 
+
 def set_compiler_targets(cc_data: list[dict]):
     '''Adds explicit -target argument to compile commands'''
     compilers = {cc['arguments'][0]: _get_cc_target(cc['arguments'][0]) for cc in cc_data}
@@ -387,10 +388,11 @@ def _find_in_ancestors(p, f, highest=False):
 
 
 parser = ArgumentParser()
-subparsers = parser.add_subparsers(required=True)
 parser.add_argument('-C', type=Path, help='execute in a directory')
 parser.add_argument('-l', action='store_true', help='enable debug logging')
+parser.add_argument('--version', action='version', version=f'territory {__version__}')
 
+subparsers = parser.add_subparsers(required=True)
 sp = subparsers.add_parser('upload')
 sp.set_defaults(func=upload)
 sp.add_argument(
