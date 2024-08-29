@@ -1,5 +1,5 @@
 '''Client for territory.dev'''
-__version__ = '1.1.2'
+__version__ = '1.1.3'
 
 
 from argparse import ArgumentParser
@@ -121,7 +121,7 @@ def add_path_to_archive(archive: tarfile.TarFile, path: Path):
         p = Path(*stk[:i])
         if stk[i-1] == '..':
             stk[i-2 : i] = []
-            i -= 1
+            i -= 2
         elif p.is_symlink():
             archive.add(p)
             lp = list(p.readlink().parts)
