@@ -1,5 +1,5 @@
 '''Client for territory.dev'''
-__version__ = '1.1.4'
+__version__ = '1.1.5'
 VERSION_STRING = f'territory CLI {__version__}'
 
 
@@ -268,8 +268,11 @@ def read_compile_commands(cc_path):
         cc_data = json.load(f)
 
     for cc in cc_data:
-        if cmd_str := cc.pop('command'):
-            cc['arguments'] = shlex.split(cmd_str)
+        try:
+            cmd_str = cc.pop('command')
+        except KeyError:
+            continue
+        cc['arguments'] = shlex.split(cmd_str)
 
     return cc_data
 
