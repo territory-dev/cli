@@ -15,8 +15,9 @@ def test_symlink_directories_in_path(tmp_path):
     g.write_text('g')
 
     tp = tmp_path / 'territory_upload.tar.gz'
+    added = set()
     with tarfile.open(tp, 'w:gz') as tar:
-        add_path_to_archive(tar, Path(tmp_path, 'd/e/G'))
+        add_path_to_archive(added, tar, Path(tmp_path, 'd/e/G'))
 
     out = tmp_path / 'out'
     out.mkdir()
@@ -40,8 +41,9 @@ def test_symlinked_file(tmp_path):
     l.symlink_to('f')
 
     tp = tmp_path / 'territory_upload.tar.gz'
+    added = set()
     with tarfile.open(tp, 'w:gz') as tar:
-        add_path_to_archive(tar, Path(tmp_path, 'l'))
+        add_path_to_archive(added, tar, Path(tmp_path, 'l'))
 
     out = tmp_path / 'out'
     out.mkdir()
@@ -71,9 +73,10 @@ def test_dir_paths_with_dotdot(tmp_path):
     out.joinpath('d/e').mkdir(parents=True)
 
     tp = tmp_path / 'territory_upload.tar.gz'
+    added = set()
     with tarfile.open(tp, 'w:gz') as tar:
-        add_path_to_archive(tar, Path(tmp_path, 'd/e/g/../h/f'))
-        add_path_to_archive(tar, Path(tmp_path, 'd/e/h/f'))
+        add_path_to_archive(added, tar, Path(tmp_path, 'd/e/g/../h/f'))
+        add_path_to_archive(added, tar, Path(tmp_path, 'd/e/h/f'))
 
     with tarfile.open(tp, 'r:gz') as tar:
         tar.extractall(out, filter='tar')
@@ -96,9 +99,10 @@ def test_many_dotdots(tmp_path):
     out = tmp_path / 'out'
 
     tp = tmp_path / 'territory_upload.tar.gz'
+    added = set()
     with tarfile.open(tp, 'w:gz') as tar:
-        add_path_to_archive(tar, f1)
-        add_path_to_archive(tar, f2)
+        add_path_to_archive(added, tar, f1)
+        add_path_to_archive(added, tar, f2)
 
     with tarfile.open(tp, 'r:gz') as tar:
         tar.extractall(out, filter='tar')

@@ -1,5 +1,6 @@
 '''Client for territory.dev'''
-__version__ = '1.1.3'
+__version__ = '1.1.4'
+VERSION_STRING = f'territory CLI {__version__}'
 
 
 from argparse import ArgumentParser
@@ -38,6 +39,7 @@ def main(argv=None):
         requests_log.setLevel(logging.DEBUG)
         requests_log.propagate = True
 
+    print(VERSION_STRING)
     cwd = (args.C or Path.cwd()).resolve()
     args.func(args, cwd)
 
@@ -76,6 +78,7 @@ def upload(args, cwd):
         else:
             tarball_in = td
         tarball_path = Path(tarball_in, 'territory_upload.tar.gz')
+        added = set()
         with tarfile.open(tarball_path, 'w:gz') as output:
             output.add(tfl, arcname=repo_root / 'TERRITORY_FILE_LISTING')
             output.add(gen_ccs_path, arcname=cc_path)
@@ -83,7 +86,7 @@ def upload(args, cwd):
                 if not path.exists():
                     print('missing file:', path)
                     continue
-                add_path_to_archive(output, path)
+                add_path_to_archive(added, output, path)
 
         if args.tarball_only:
             print('created', tarball_path)
@@ -113,7 +116,7 @@ def upload(args, cwd):
         print(f'Indexing will begin shortly. You can track build status at <https://app.territory.dev/repos/{args.repo_id}/jobs>.')
 
 
-def add_path_to_archive(archive: tarfile.TarFile, path: Path):
+def add_path_to_archive(added: set[Path], archive: tarfile.TarFile, path: Path):
     '''Adds a file to archive, ensuring symlinks are preserved and paths normalized'''
     stk = list(path.parts)
     i = 1
@@ -123,12 +126,16 @@ def add_path_to_archive(archive: tarfile.TarFile, path: Path):
             stk[i-2 : i] = []
             i -= 2
         elif p.is_symlink():
-            archive.add(p)
+            if p not in added:
+                added.add(p)
+                archive.add(p)
             lp = list(p.readlink().parts)
             stk[i-1:i] = lp
             i -= 1
         elif p.is_file():
-            archive.add(p)
+            if p not in added:
+                added.add(p)
+                archive.add(p)
         i += 1
 
 
@@ -269,7 +276,8 @@ def read_compile_commands(cc_path):
 
 def set_compiler_targets(cc_data: list[dict]):
     '''Adds explicit -target argument to compile commands'''
-    compilers = {cc['arguments'][0]: _get_cc_target(cc['arguments'][0]) for cc in cc_data}
+    uniq_bins = {cc['arguments'][0] for cc in cc_data}
+    compilers = {ex: _get_cc_target(ex) for ex in uniq_bins}
     for cc in cc_data:
         args: list[str] = cc['arguments']
         if '-target' in args:
@@ -281,6 +289,7 @@ def set_compiler_targets(cc_data: list[dict]):
 
 
 def _get_cc_target(compiler_bin) -> str | None:
+    print('querying target arch for', compiler_bin)
     out = check_output([compiler_bin, '-v'], stderr=STDOUT, text=True)
     lines = out.splitlines()
     for l in lines:
@@ -390,7 +399,7 @@ def _find_in_ancestors(p, f, highest=False):
 parser = ArgumentParser()
 parser.add_argument('-C', type=Path, help='execute in a directory')
 parser.add_argument('-l', action='store_true', help='enable debug logging')
-parser.add_argument('--version', action='version', version=f'territory {__version__}')
+parser.add_argument('--version', action='version', version=VERSION_STRING)
 
 subparsers = parser.add_subparsers(required=True)
 sp = subparsers.add_parser('upload')
