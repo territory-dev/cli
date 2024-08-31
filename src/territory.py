@@ -1,10 +1,11 @@
 '''Client for territory.dev'''
-__version__ = '1.1.5'
+__version__ = '1.2.0'
 VERSION_STRING = f'territory CLI {__version__}'
 
 
 from argparse import ArgumentParser
 from hashlib import blake2b
+from dataclasses import dataclass
 from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
 from pathlib import Path
@@ -65,13 +66,11 @@ def upload(args, cwd):
 
         cc_path = compile_commands_dir / 'compile_commands.json'
         cc_data = read_compile_commands(cc_path)
-        set_compiler_targets(cc_data)
+        cc_files = collect_details(td, compile_commands_dir, cc_data)
+        captured_files.update(cc_files)
         gen_ccs_path = Path(td, 'compile_commands.json')
         with gen_ccs_path.open('w') as f:
             json.dump(cc_data, f, indent=4)
-
-        cc_files = _collect_from_compilation_database(td, compile_commands_dir, cc_data)
-        captured_files.update(cc_files)
 
         if args.tarball_only:
             tarball_in = repo_root
@@ -132,10 +131,9 @@ def add_path_to_archive(added: set[Path], archive: tarfile.TarFile, path: Path):
             lp = list(p.readlink().parts)
             stk[i-1:i] = lp
             i -= 1
-        elif p.is_file():
-            if p not in added:
-                added.add(p)
-                archive.add(p)
+        elif p not in added:
+            added.add(p)
+            archive.add(p, recursive=False)
         i += 1
 
 
@@ -277,97 +275,119 @@ def read_compile_commands(cc_path):
     return cc_data
 
 
-def set_compiler_targets(cc_data: list[dict]):
-    '''Adds explicit -target argument to compile commands'''
-    uniq_bins = {cc['arguments'][0] for cc in cc_data}
-    compilers = {ex: _get_cc_target(ex) for ex in uniq_bins}
-    for cc in cc_data:
-        args: list[str] = cc['arguments']
-        if '-target' in args:
-            continue
-        target = compilers[args[0]]
-        if not target:
-            continue
-        args[1:1] = ['-target', target]
-
-
-def _get_cc_target(compiler_bin) -> str | None:
-    print('querying target arch for', compiler_bin)
-    out = check_output([compiler_bin, '-v'], stderr=STDOUT, text=True)
-    lines = out.splitlines()
-    for l in lines:
-        m = re.match('^Target: (.+)$', l)
-        if m:
-            return m.group(1)
-    return None
-
-
-def _collect_from_compilation_database(tmp_dir, cc_dir, cc_data):
+def collect_details(tmp_dir, cc_dir, cc_data):
     with \
             Pool(cpu_count() * 2) as pool, \
-            tqdm.tqdm(total=len(cc_data), desc='collecting dependencies from sources') as progr:
-        result = set()
-        def _cb(paths):
-            result.update(paths)
+            tqdm.tqdm(total=len(cc_data), desc='collecting compilation details') as progr:
+        dep_paths = set()
+        def _cb(details):
+            idx, paths, arguments = details
+            dep_paths.update(paths)
+            cc_data[idx]['arguments'] = arguments
             progr.update(1)
         def _ecb(e):
             print('error:', e)
             progr.update(1)
-        for cmd in cc_data:
+        for i, cmd in enumerate(cc_data):
             dir_ = cmd.get('directory') or cc_dir
             p = Path(dir_, cmd['file'])
-            result.add(p)
+            dep_paths.add(p)
             pool.apply_async(
-                _query_dependencies,
-                (cc_dir, tmp_dir, cmd),
+                _query_details,
+                (i, cc_dir, tmp_dir, cmd),
                 {},
                 callback=_cb,
                 error_callback=_ecb)
         pool.close()
         pool.join()
 
-    return result
+    return dep_paths
 
 
-def _query_dependencies(cc_dir: Path, tmp_dir: Path, compilation_command):
-    arguments = compilation_command['arguments'][:]
+def remove_arg(arguments, key, count, prefix=False):
+    for fi, arg in enumerate(arguments):
+        if arg == key:
+            return arguments[0:fi] + arguments[fi+count:]
 
-    args_to_remove = ['-c', '-MMD']
-    for arg in args_to_remove:
-        try:
-            arguments.remove(arg)
-        except ValueError:
-            pass
+        if  (prefix and arg.startswith(key)):
+            return arguments[0:fi] + arguments[fi+1:]
+    else:
+        return arguments
 
-    args_with_paths_to_remove = ['-o', '-MF']
-    for arg in args_with_paths_to_remove:
-        try:
-            fi = arguments.index(arg)
-        except ValueError:
-            continue
 
-        arguments = arguments[0:fi] + arguments[fi+2:]
+@dataclass
+class Vee:
+    target: str | None = None
+    angle_bracket_include_paths: list[str] | None = None
+
+
+def parse_vee(text) -> Vee:
+    vee = Vee()
+    m = re.search('^Target: (.+)$', text, re.MULTILINE)
+    if m:
+        vee.target = m.group(1)
+
+    m = re.search(r'#include <\.\.\.> search starts here:\n((^ .*\n)*)', text, re.MULTILINE)
+    if m:
+        vee.angle_bracket_include_paths = re.findall(r'^ (.*?)(?: \(framework directory|headermap\)\n|\n)', m.group(1), re.MULTILINE)
+    return vee
+
+
+def _query_details(index, cc_dir: Path, tmp_dir: Path, compilation_command):
+    q_arguments = compilation_command['arguments'][:]
+
+    q_arguments = remove_arg(q_arguments, '-c', 1)
+    q_arguments = remove_arg(q_arguments, '-M', 1)
+    q_arguments = remove_arg(q_arguments, '-MD', 1)
+    q_arguments = remove_arg(q_arguments, '-MM', 1)
+    q_arguments = remove_arg(q_arguments, '-MMD', 1)
+    q_arguments = remove_arg(q_arguments, '-o', 2, prefix=True)
+    q_arguments = remove_arg(q_arguments, '-MF', 2, prefix=True)
 
     deps_dir = tmp_dir / 'deps'
     deps_dir.mkdir(parents=True, exist_ok=True)
-    out_file = deps_dir / blake2b(compilation_command['file'].encode()).hexdigest()
+    deps_file = deps_dir / (blake2b(compilation_command['file'].encode()).hexdigest() + '.d')
 
-    arguments = [arguments[0], '-E', '-MD', '-MF' + str(out_file), *arguments[1:], '-o', '/dev/null']
-    run(arguments, cwd=compilation_command.get('directory') or cc_dir)
+    q_arguments = [q_arguments[0], '-E', '-MD', '-MF' + str(deps_file), *q_arguments[1:], '-v', '-o', '/dev/null']
+    completion = run(q_arguments, cwd=compilation_command.get('directory') or cc_dir, stderr=PIPE, text=True)
 
-    if out_file.exists():
-        deps_text = out_file.read_text()
-        out_file.unlink()
-        _target, deps = deps_text.split(':', 1)
+    arguments = compilation_command['arguments'][:]
+    vd = parse_vee(completion.stderr)
+    if vd.target is not None:
+        arguments[1:1] = ['-target', vd.target]
+
+    if vd.angle_bracket_include_paths:
+        arguments = remove_arg(arguments, '-I', 2, prefix=True)
+        arguments = remove_arg(arguments, '--include-directory', 2)
+        arguments = remove_arg(arguments, '--include-directory=', 1, prefix=True)
+        arguments = remove_arg(arguments, '-cxx-isystem', 2, prefix=True)
+        arguments = remove_arg(arguments, '-ibuiltininc', 1)
+        arguments = remove_arg(arguments, '-iframework', 2, prefix=True)
+        arguments = remove_arg(arguments, '-iframeworkwithsysroot', 2, prefix=True)
+        arguments = remove_arg(arguments, '--stdlib++-isystem', 2, prefix=True)
+        arguments = remove_arg(arguments, '-isystem', 2, prefix=True)
+
+        incs = [f'-I{dir}' for dir in vd.angle_bracket_include_paths]
+        arguments[1:1] = ['-nostdinc', *incs]
+
+    if deps_file.exists():
+        deps_text = deps_file.read_text()
+        deps_file.unlink()
+        try:
+            _target, deps = deps_text.split(':', 1)
+        except Exception as e:
+            print('failed to read dependencies:', deps_text, e)
+            return set()
         lines = [l.rstrip('\\') for l in deps.splitlines()]
         files = shlex.split(' '.join(lines))
 
         dir_ = compilation_command.get('directory') or cc_dir
 
-        return {Path(dir_, f) for f in files}
+        return index, {Path(dir_, f) for f in files}, arguments
     else:
+        print(completion.stderr)
         print('no dependencies recorded for', compilation_command['file'])
-        return set()
+        return index, set(), arguments
 
 
 def _list_repo_files(dir):

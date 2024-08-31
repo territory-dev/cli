@@ -20,6 +20,7 @@ TEST_REPO_EXPECTED_FILES = [
     'mod1.c',
     'compile_commands.json',
     'Makefile',
+    'dir',
     'dir/mod2.c',
 ]
 
@@ -29,10 +30,11 @@ def test_upload(mock_authserver, monkeypatch, tmp_path):
         'TERRITORY_AUTHORIZER',
         f'{mock_authserver.location}/static/authorize.html')
     monkeypatch.setenv('TERRITORY_UPLOAD_API', mock_authserver.location)
-    init_repo(tmp_path / 'repo')
+    repo_path = tmp_path / 'repo'
+    init_repo(repo_path)
 
     main([
-        '-C', str(tmp_path / 'repo'),
+        '-C', str(repo_path),
         'upload',
         '--upload-token-path', str(tmp_path / 'upload_token'),
         '--repo-id', 'test_repo_id',
@@ -42,18 +44,23 @@ def test_upload(mock_authserver, monkeypatch, tmp_path):
 
     upload, = mock_authserver.uploaded
     assert len(upload) > 0
+
     with tarfile.open(fileobj=BytesIO(upload), mode='r:gz') as tf:
         assert sorted(tf.getnames()) == sorted([
-            str(tmp_path / 'repo' / f).lstrip('/')
+            str(repo_path / f).lstrip('/')
             for f in TEST_REPO_EXPECTED_FILES
+        ] + [
+            str(p).lstrip('/')
+            for p in list(repo_path.parents) + [repo_path]
         ])
 
 
 def test_tarball_only(tmp_path):
-    init_repo(tmp_path / 'repo')
+    repo_path = tmp_path / 'repo'
+    init_repo(repo_path)
 
     main([
-        '-C', str(tmp_path / 'repo'),
+        '-C', str(repo_path),
         'upload',
         '--upload-token-path', str(tmp_path / 'upload_token'),
         '--tarball-only',
@@ -64,8 +71,11 @@ def test_tarball_only(tmp_path):
     with tarball_path.open('rb') as fo:
         with tarfile.open(fileobj=fo, mode='r:gz') as tf:
             assert sorted(tf.getnames()) == sorted([
-                str(tmp_path / 'repo' / f).lstrip('/')
+                str(repo_path / f).lstrip('/')
                 for f in TEST_REPO_EXPECTED_FILES
+            ] + [
+                str(p).lstrip('/')
+                for p in list(repo_path.parents) + [repo_path]
             ])
 
 
