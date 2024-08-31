@@ -1,5 +1,5 @@
 '''Client for territory.dev'''
-__version__ = '1.2.0'
+__version__ = '1.2.1'
 VERSION_STRING = f'territory CLI {__version__}'
 
 
@@ -333,7 +333,7 @@ def parse_vee(text) -> Vee:
     return vee
 
 
-def _query_details(index, cc_dir: Path, tmp_dir: Path, compilation_command):
+def _query_details(index: int, cc_dir: Path, tmp_dir: Path, compilation_command):
     q_arguments = compilation_command['arguments'][:]
 
     q_arguments = remove_arg(q_arguments, '-c', 1)
@@ -377,7 +377,7 @@ def _query_details(index, cc_dir: Path, tmp_dir: Path, compilation_command):
             _target, deps = deps_text.split(':', 1)
         except Exception as e:
             print('failed to read dependencies:', deps_text, e)
-            return set()
+            return index, set(), arguments
         lines = [l.rstrip('\\') for l in deps.splitlines()]
         files = shlex.split(' '.join(lines))
 
@@ -385,9 +385,11 @@ def _query_details(index, cc_dir: Path, tmp_dir: Path, compilation_command):
 
         return index, {Path(dir_, f) for f in files}, arguments
     else:
-        print(completion.stderr)
         print('no dependencies recorded for', compilation_command['file'])
-        return index, set(), arguments
+
+    if completion.returncode != 0:
+        print(completion.stderr)
+    return index, set(), arguments
 
 
 def _list_repo_files(dir):

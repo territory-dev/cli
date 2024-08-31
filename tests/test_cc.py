@@ -1,3 +1,5 @@
+from shutil import which
+
 from territory import collect_details, read_compile_commands, remove_arg, parse_vee
 from territory_testlib import init_repo
 
@@ -11,7 +13,24 @@ def test_collect_details(tmp_path):
     assert '-target' in cc_data[0]['arguments']
     assert '-target' in cc_data[1]['arguments']
     assert tmp_path / 'repo/mod1.c' in paths
+    assert tmp_path / 'repo/shared.h' in paths
     assert tmp_path / 'repo/dir/mod2.c' in paths
+
+
+def test_collect_details_cc_error(tmp_path):
+    init_repo(tmp_path / 'repo')
+    (tmp_path / 'repo/mod1.c').write_text('BAD SYNTAX')
+    (tmp_path / 'repo/dir/mod2.c').write_text('BAD SYNTAX')
+
+    cc_data = read_compile_commands(tmp_path / 'repo/compile_commands.json')
+    td = tmp_path / 't'
+    td.mkdir()
+    paths = collect_details(td, tmp_path / 'repo', cc_data)
+    assert '-target' in cc_data[0]['arguments']
+    assert '-target' in cc_data[1]['arguments']
+    assert tmp_path / 'repo/mod1.c' in paths
+    assert tmp_path / 'repo/dir/mod2.c' in paths
+    assert tmp_path / 'repo/shared.h' not in paths
 
 
 def test_remove_arg():
