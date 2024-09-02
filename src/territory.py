@@ -1,5 +1,5 @@
 '''Client for territory.dev'''
-__version__ = '1.2.2'
+__version__ = '1.2.3'
 VERSION_STRING = f'territory CLI {__version__}'
 
 
@@ -356,7 +356,7 @@ def _query_details(index: int, cc_dir: Path, tmp_dir: Path, compilation_command)
     deps_dir.mkdir(parents=True, exist_ok=True)
     deps_file = deps_dir / (blake2b(compilation_command['file'].encode()).hexdigest() + '.d')
 
-    q_arguments = [q_arguments[0], '-E', '-MD', '-MF' + str(deps_file), *q_arguments[1:], '-v', '-o', '/dev/null']
+    q_arguments = [q_arguments[0], '-E', '-MD', '-MF' + str(deps_file), *q_arguments[1:], '-v', '-o', '/dev/null', '-Wno-error']
     completion = run(q_arguments, cwd=compilation_command.get('directory') or cc_dir, stderr=PIPE, text=True)
 
     arguments = compilation_command['arguments'][:]
