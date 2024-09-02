@@ -39,6 +39,7 @@ def test_remove_arg():
     assert remove_arg(['cc', '-c', '-o', '/foo', 'bar'], '-o', 2) == ['cc', '-c', 'bar']
     assert remove_arg(['cc', '-c', '-o/foo', 'bar'], '-o', 2) == ['cc', '-c', '-o/foo', 'bar']
     assert remove_arg(['cc', '-c', '-o', '/foo', 'bar'], '-c', 1) == ['cc', '-o', '/foo', 'bar']
+    assert remove_arg(['cc', '-Ifoo', '-Ibar', '-Ibaz', '-iLocal', 'f.cc'], '-I', 2, prefix=True) == ['cc', '-iLocal', 'f.cc']
 
 
 def test_read_vee():

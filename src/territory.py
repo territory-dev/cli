@@ -1,5 +1,5 @@
 '''Client for territory.dev'''
-__version__ = '1.2.1'
+__version__ = '1.2.2'
 VERSION_STRING = f'territory CLI {__version__}'
 
 
@@ -305,14 +305,22 @@ def collect_details(tmp_dir, cc_dir, cc_data):
 
 
 def remove_arg(arguments, key, count, prefix=False):
-    for fi, arg in enumerate(arguments):
-        if arg == key:
-            return arguments[0:fi] + arguments[fi+count:]
+    res = []
+    fi = 0
+    while fi < len(arguments):
+        arg = arguments[fi]
 
-        if  (prefix and arg.startswith(key)):
-            return arguments[0:fi] + arguments[fi+1:]
-    else:
-        return arguments
+        if arg == key:
+            fi += count
+
+        elif  (prefix and arg.startswith(key)):
+            fi += 1
+
+        else:
+            res.append(arg)
+            fi += 1
+
+    return res
 
 
 @dataclass
