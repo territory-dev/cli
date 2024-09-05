@@ -1,5 +1,5 @@
 '''Client for territory.dev'''
-__version__ = '1.2.3'
+__version__ = '1.2.4'
 VERSION_STRING = f'territory CLI {__version__}'
 
 
@@ -374,6 +374,11 @@ def _query_details(index: int, cc_dir: Path, tmp_dir: Path, compilation_command)
         arguments = remove_arg(arguments, '-iframeworkwithsysroot', 2, prefix=True)
         arguments = remove_arg(arguments, '--stdlib++-isystem', 2, prefix=True)
         arguments = remove_arg(arguments, '-isystem', 2, prefix=True)
+        arguments = remove_arg(arguments, '-M', 1)
+        arguments = remove_arg(arguments, '-MD', 1)
+        arguments = remove_arg(arguments, '-MM', 1)
+        arguments = remove_arg(arguments, '-MMD', 1)
+        arguments = remove_arg(arguments, '-MF', 2, prefix=True)
 
         incs = [f'-I{dir}' for dir in vd.angle_bracket_include_paths]
         arguments[1:1] = ['-nostdinc', *incs]
