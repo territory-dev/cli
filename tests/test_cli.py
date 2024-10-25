@@ -8,7 +8,7 @@ import tarfile
 from flask import Flask, request
 import pytest
 
-from territory import main
+from territory.cli import main
 from territory_testlib import init_repo
 
 

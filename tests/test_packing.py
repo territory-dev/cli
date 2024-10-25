@@ -1,7 +1,7 @@
 from pathlib import Path
 import tarfile
 
-from territory import add_path_to_archive
+from territory.files import add_path_to_archive
 
 
 def test_symlink_directories_in_path(tmp_path):

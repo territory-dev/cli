@@ -1,6 +1,4 @@
-from shutil import which
-
-from territory import collect_details, read_compile_commands, remove_arg, parse_vee
+from territory.c import collect_details, read_compile_commands, remove_arg, parse_vee
 from territory_testlib import init_repo
 
 
