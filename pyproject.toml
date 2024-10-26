@@ -23,4 +23,4 @@ Home = "https://territory.dev"
 Source = "https://github.com/territory-dev/cli"
 
 [project.scripts]
-territory = "territory:main"
+territory = "territory.cli:main"
