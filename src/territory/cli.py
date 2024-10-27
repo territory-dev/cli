@@ -3,9 +3,9 @@ VERSION_STRING = f'territory CLI {__version__}'
 
 
 from argparse import ArgumentParser
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import json
 import logging
 import tarfile
 
@@ -14,14 +14,14 @@ import tqdm
 
 from .api_client import DEFAULT_UPLOAD_TOKEN_PATH, auth, create_build_request
 from .git import find_repo_root, list_repo_files, get_sha, get_commit_message, get_branch
-from .c import find_compile_commands_dir, read_compile_commands, collect_details
+from . import c, go
 from .files import add_path_to_archive
 
 
 def main(argv=None):
     args = parser.parse_args(args=argv)
 
-    if args.l:
+    if args.L:
         logging.basicConfig(level=logging.DEBUG)
         requests_log = logging.getLogger("requests.packages.urllib3")
         requests_log.setLevel(logging.DEBUG)
@@ -32,6 +32,15 @@ def main(argv=None):
     args.func(args, cwd)
 
 
+@dataclass
+class Package:
+    work_dir: Path
+    temp_dir: Path
+    repo_root: Path
+    captured_files: set[Path]
+    index_system: bool
+
+
 def upload(args, cwd):
     if not args.tarball_only:
         upload_token = auth(args)
@@ -39,8 +48,10 @@ def upload(args, cwd):
     repo_root = find_repo_root(cwd)
     print('repository root directory:', repo_root)
 
-    compile_commands_dir = find_compile_commands_dir(cwd)
-    print('compilation database:', compile_commands_dir / 'compile_commands.json')
+    if args.l == 'go':
+        lang = go.Lang()
+    else:
+        lang = c.Lang()
 
     with TemporaryDirectory() as td:
         td = Path(td)
@@ -51,13 +62,14 @@ def upload(args, cwd):
         tfl.write_text(repo_files)
         captured_files.update(Path(cwd, p) for p in repo_files.split('\n'))
 
-        cc_path = compile_commands_dir / 'compile_commands.json'
-        cc_data = read_compile_commands(cc_path)
-        cc_files = collect_details(td, compile_commands_dir, cc_data)
-        captured_files.update(cc_files)
-        gen_ccs_path = Path(td, 'compile_commands.json')
-        with gen_ccs_path.open('w') as f:
-            json.dump(cc_data, f, indent=4)
+        package = Package(
+            work_dir=cwd,
+            temp_dir=td,
+            repo_root=repo_root,
+            captured_files=captured_files,
+            index_system=args.system,
+        )
+        lang.prepare_package(package)
 
         if args.tarball_only:
             tarball_in = repo_root
@@ -67,8 +79,8 @@ def upload(args, cwd):
         added = set()
         with tarfile.open(tarball_path, 'w:gz') as output:
             output.add(tfl, arcname=repo_root / 'TERRITORY_FILE_LISTING')
-            output.add(gen_ccs_path, arcname=cc_path)
-            for path in tqdm.tqdm(captured_files, 'compressing'):
+            lang.add_to_tar_file(package, output)
+            for path in tqdm.tqdm(package.captured_files, 'compressing'):
                 if not path.exists():
                     print('missing file:', path)
                     continue
@@ -84,9 +96,9 @@ def upload(args, cwd):
             'commit': get_sha(repo_root),
             'commit_message': get_commit_message(repo_root),
             'repo_root': str(repo_root),
-            'compile_commands_dir': str(compile_commands_dir),
             'index_system': args.system,
         }
+        lang.add_to_meta(meta)
 
         print('registering build request')
         blob_size = tarball_path.stat().st_size
@@ -103,13 +115,14 @@ def upload(args, cwd):
 
 
 parser = ArgumentParser()
-parser.add_argument('-C', type=Path, help='execute in a directory')
-parser.add_argument('-l', action='store_true', help='enable debug logging')
+parser.add_argument('-C', type=Path, help='execute in a directory', metavar='PARSEDIR')
+parser.add_argument('-L', action='store_true', help='enable debug logging')
 parser.add_argument('--version', action='version', version=VERSION_STRING)
 
 subparsers = parser.add_subparsers(required=True)
 sp = subparsers.add_parser('upload')
 sp.set_defaults(func=upload)
+sp.add_argument('-l', choices=['c', 'c++', 'go'], help='Language to parse')
 sp.add_argument(
     '--upload-token-path',
     type=Path,

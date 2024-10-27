@@ -13,6 +13,27 @@ import tqdm
 from .files import find_in_ancestors
 
 
+class Lang:
+    def prepare_package(self, package):
+        self.compile_commands_dir = find_compile_commands_dir(package.work_dir)
+        print('compilation database:', self.compile_commands_dir / 'compile_commands.json')
+
+        self.cc_path = self.compile_commands_dir / 'compile_commands.json'
+        cc_data = read_compile_commands(self.cc_path)
+        cc_files = collect_details(package.temp_dir, self.compile_commands_dir, cc_data)
+        package.captured_files.update(cc_files)
+        self.gen_ccs_path = Path(package.temp_dir, 'compile_commands.json')
+        with self.gen_ccs_path.open('w') as f:
+            json.dump(cc_data, f, indent=4)
+
+    def add_to_tar_file(self, package, output):
+        output.add(self.gen_ccs_path, arcname=self.cc_path)
+
+    def add_to_meta(self, meta):
+        meta['compile_commands_dir'] = str(self.compile_commands_dir)
+        meta['lang'] = 'c'
+
+
 def find_compile_commands_dir(p):
     try:
         return find_in_ancestors(p, lambda p: (p / 'compile_commands.json').exists())

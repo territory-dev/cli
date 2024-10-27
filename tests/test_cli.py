@@ -106,6 +106,7 @@ def mock_authserver():
                 'repo_root': ANY,
                 'compile_commands_dir': ANY,
                 'index_system': False,
+                'lang': 'c',
             },
         }
 
