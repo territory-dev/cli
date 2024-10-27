@@ -39,9 +39,11 @@ class Package:
     repo_root: Path
     captured_files: set[Path]
     index_system: bool
+    upload_token: str | None
 
 
 def upload(args, cwd):
+    upload_token = None
     if not args.tarball_only:
         upload_token = auth(args)
 
@@ -68,6 +70,7 @@ def upload(args, cwd):
             repo_root=repo_root,
             captured_files=captured_files,
             index_system=args.system,
+            upload_token=upload_token,
         )
         lang.prepare_package(package)
 

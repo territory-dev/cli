@@ -1,9 +1,10 @@
+from shutil import copyfileobj
 from socket import gethostname
+from sys import exit
 from urllib.parse import urlencode, urlparse
 import http.server
 import json
 import os
-from sys import exit
 import threading
 import webbrowser
 
@@ -27,13 +28,25 @@ def create_build_request(upload_token, repo_id, branch, meta, blob_size):
             'len': blob_size,
         },
         headers={
-            'Authorization': f'bearer {upload_token}',
+            'Authorization': f'Bearer {upload_token}',
             'User-Agent': f'territory/{__version__}',
         })
-    if response.status_code == 429:
+    if not response.ok:
+        print('HTTP status', response.status_code)
         exit(response.text)
-    response.raise_for_status()
     return response.json()
+
+
+def download_resource(upload_token, resource, destination):
+    uploader_api_url = _uploader_api_url()
+    response = requests.get(
+        uploader_api_url + '/build-resource/' + resource,
+        headers={
+            'Authorization': f'Bearer {upload_token}',
+            'User-Agent': f'territory/{__version__}',
+        })
+    response.raise_for_status()
+    destination.write_bytes(response.content)
 
 
 def _uploader_api_url():
