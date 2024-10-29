@@ -140,4 +140,3 @@ repo_or_tarball.add_argument(
     '--tarball-only',
     action='store_true',
     help='do not upload, create territory_upload.tar.gz output only')
-

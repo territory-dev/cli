@@ -6,7 +6,9 @@ from subprocess import check_call
 from .api_client import download_resource
 
 
-BINARY_KEY = f'goscan-{system().lower()}-{machine().lower()}'
+MACHINE = machine().lower()
+if MACHINE == 'x86_64':  MACHINE = 'amd64'
+BINARY_KEY = f'goscan-{system().lower()}-{MACHINE}'
 
 
 class Lang:
