@@ -8,6 +8,7 @@ from .api_client import download_resource
 
 MACHINE = machine().lower()
 if MACHINE == 'x86_64':  MACHINE = 'amd64'
+if MACHINE == 'aarch64':  MACHINE = 'arm64'
 BINARY_KEY = f'goscan-{system().lower()}-{MACHINE}'
 
 
