@@ -1,7 +1,8 @@
-from hashlib import blake2b
 from dataclasses import dataclass
+from hashlib import blake2b
 from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
+from os import environ
 from pathlib import Path
 from subprocess import PIPE, run
 import json
@@ -56,8 +57,13 @@ def read_compile_commands(cc_path):
 
 
 def collect_details(tmp_dir, cc_dir, cc_data):
+    if 'CORES' in environ:
+        procs = int(environ['CORES'])
+    else:
+        procs = cpu_count() * 2
+
     with \
-            Pool(cpu_count() * 2) as pool, \
+            Pool(procs) as pool, \
             tqdm.tqdm(total=len(cc_data), desc='collecting compilation details') as progr:
         dep_paths = set()
         def _cb(details):
