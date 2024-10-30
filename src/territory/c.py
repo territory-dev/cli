@@ -4,7 +4,7 @@ from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
 from os import environ
 from pathlib import Path
-from subprocess import PIPE, run
+from subprocess import DEVNULL, PIPE, run
 import json
 import re
 import shlex
@@ -143,7 +143,12 @@ def _query_details(index: int, cc_dir: Path, tmp_dir: Path, compilation_command)
     deps_file = deps_dir / (blake2b(compilation_command['file'].encode()).hexdigest() + '.d')
 
     q_arguments = [q_arguments[0], '-E', '-MD', '-MF' + str(deps_file), *q_arguments[1:], '-v', '-o', '/dev/null', '-Wno-error']
-    completion = run(q_arguments, cwd=compilation_command.get('directory') or cc_dir, stderr=PIPE, text=True)
+    completion = run(
+        q_arguments,
+        cwd=compilation_command.get('directory') or cc_dir,
+        stderr=PIPE,
+        stdin=DEVNULL,
+        text=True)
 
     arguments = compilation_command['arguments'][:]
     vd = parse_vee(completion.stderr)
