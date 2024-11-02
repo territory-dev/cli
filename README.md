@@ -5,10 +5,18 @@ Watch a video walkthrough:
 
 [![YouTube video showing an example of using the client](https://img.youtube.com/vi/2gYkxGcLPoM/1.jpg)](https://www.youtube.com/watch?v=2gYkxGcLPoM)
 
-## 1. Clone a git repository and generate `compile_commands.json`
+## 1. Prepare your repository
 
-See examples of how `compile_commands.json` can be generated
+### For C/C++ Projects
+Clone your repository and generate `compile_commands.json`. See examples of how this can be generated
 [here](https://github.com/territory-dev/builds?tab=readme-ov-file#how-do-i-generate-compile_commandsjson).
+
+### For Go Projects
+Clone your repository and ensure your Go module is properly initialized:
+
+```bash
+go mod download
+```
 
 ## 2. Add a new repo in the territory.dev interface
 
@@ -21,7 +29,7 @@ Repositories,
 
 ![](./doc/Screenshot%202024-08-22%20at%2008.56.12.png)
 
-enter repository details and choose the "Uploaded" option,
+enter repository details, choose the "Uploaded" option, and select the appropriate language (C/C++ or Go),
 
 ![](./doc/Screenshot%202024-08-22%20at%2008.57.26.png)
 
@@ -37,16 +45,26 @@ pip install territory
 
 ## 4. Run the upload
 
-In the directory containing `compile_commands.json` run
+### For C/C++ Projects
+In the directory containing `compile_commands.json` run:
 
+```bash
+territory upload --repo-id $YOUR_REPOSITORY_ID -l c
 ```
-territory upload --repo-id $YOUR_REPOSITORY_ID
+
+### For Go Projects
+In your git repository run:
+
+```bash
+territory upload --repo-id $YOUR_REPOSITORY_ID -l go
 ```
+We will scan the repo for modules, package parse results and send the code
+for indexing.
 
 The specific command containing the repository ID can be found in repository
 settings under "Recent builds".
 
-First time you use the client, we will open the web brower and you will be
+First time you use the client, we will open the web browser and you will be
 asked to authenticate the client in the web app.
 
 Once the upload finishes, indexing will start.
