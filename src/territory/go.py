@@ -16,7 +16,7 @@ class Lang:
     def prepare_package(self, package):
         self.package = package
         self.uim_dir = package.temp_dir / 'uim'
-        self._run_go_scanner(package.work_dir, self.uim_dir, package.index_system)
+        self._run_go_scanner(package.repo_root, self.uim_dir, package.index_system)
 
     def add_to_tar_file(self, package, output):
         # for uim in self.uim_dir.glob('*'):
