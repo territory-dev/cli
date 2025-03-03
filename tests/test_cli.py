@@ -31,7 +31,14 @@ TEST_REPO_EXPECTED_FILES = {
         '.territory/uim',
         '.territory/uim/nodes.uim',
         '.territory/uim/search.uim',
-    ]
+    ],
+    'python': [
+        'TERRITORY_FILE_LISTING',
+        'example.py',
+        '.territory/uim',
+        '.territory/uim/nodes.uim',
+        '.territory/uim/search.uim',
+    ],
 }
 
 BUILD_REQUESTS = {
@@ -59,11 +66,23 @@ BUILD_REQUESTS = {
             'index_system': False,
             'lang': 'go',
         },
-    }
+    },
+    'python': {
+        'repo_id': 'test_repo_id',
+        'branch': 'main',
+        'len': ANY,
+        'meta': {
+            'commit': ANY,
+            'commit_message': 'initial commit\n\n',
+            'repo_root': ANY,
+            'index_system': False,
+            'lang': 'python',
+        },
+    },
 }
 
 
-@pytest.mark.parametrize('lang', ['c', 'go'])
+@pytest.mark.parametrize('lang', ['c', 'go', 'python'])
 def test_upload(mock_authserver, monkeypatch, tmp_path, lang):
     monkeypatch.setenv(
         'TERRITORY_AUTHORIZER',
@@ -97,7 +116,7 @@ def test_upload(mock_authserver, monkeypatch, tmp_path, lang):
         ])
 
 
-@pytest.mark.parametrize('lang', ['c', 'go'])
+@pytest.mark.parametrize('lang', ['c', 'go', 'python'])
 def test_tarball_only(tmp_path, lang):
     repo_path = tmp_path / 'repo'
     init_repo(repo_path, lang=lang)

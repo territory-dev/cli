@@ -52,7 +52,7 @@ def upload(args, cwd):
 
     if args.lang == 'go':
         lang = go.Lang()
-    if args.lang == 'python':
+    elif args.lang == 'python':
         lang = python.Lang()
     else:
         lang = c.Lang()
