@@ -11,6 +11,7 @@ dependencies = [
     "requests >= 2.32.3, <3",
     "platformdirs >= 4.2.2, <5",
     "tqdm >= 4.66.5, <5",
+    "territory-python-scanner",
 ]
 [project.optional-dependencies]
 test = [

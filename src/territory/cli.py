@@ -14,7 +14,7 @@ import tqdm
 
 from .api_client import DEFAULT_UPLOAD_TOKEN_PATH, auth, create_build_request
 from .git import find_repo_root, list_repo_files, get_sha, get_commit_message, get_branch
-from . import c, go
+from . import c, go, python
 from .files import add_path_to_archive
 
 
@@ -50,8 +50,10 @@ def upload(args, cwd):
     repo_root = find_repo_root(cwd)
     print('repository root directory:', repo_root)
 
-    if args.l == 'go':
+    if args.lang == 'go':
         lang = go.Lang()
+    if args.lang == 'python':
+        lang = python.Lang()
     else:
         lang = c.Lang()
 
@@ -125,7 +127,7 @@ parser.add_argument('--version', action='version', version=VERSION_STRING)
 subparsers = parser.add_subparsers(required=True)
 sp = subparsers.add_parser('upload')
 sp.set_defaults(func=upload)
-sp.add_argument('-l', choices=['c', 'c++', 'go'], help='Language to parse')
+sp.add_argument('-l', '--lang', choices=['c', 'c++', 'go', 'python'], help='Language to parse')
 sp.add_argument(
     '--upload-token-path',
     type=Path,
