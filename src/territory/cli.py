@@ -47,7 +47,7 @@ def upload(args, cwd):
     if not args.tarball_only:
         upload_token = auth(args)
 
-    repo_root = find_repo_root(cwd)
+    repo_root = find_repo_root(cwd).resolve()
     print('repository root directory:', repo_root)
 
     if args.lang == 'go':

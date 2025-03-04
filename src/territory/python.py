@@ -19,7 +19,7 @@ class Lang:
         if system:
             cmd.append('--system')
         cmd.extend([
-            scan_dir,
-            uim_output_dir
+            str(scan_dir),
+            str(uim_output_dir)
         ])
         check_call(cmd)
