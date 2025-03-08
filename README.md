@@ -18,6 +18,10 @@ Clone your repository and ensure your Go module is properly initialized:
 go mod download
 ```
 
+### For Python Projects
+If you created a virtualenv for your project, we recommend you install and run `territory` with
+it activated.
+
 ## 2. Add a new repo in the territory.dev interface
 
 Go to settings,
@@ -52,11 +56,15 @@ In the directory containing `compile_commands.json` run:
 territory upload --repo-id $YOUR_REPOSITORY_ID -l c
 ```
 
-### For Go Projects
+### For Go and Python Projects
 In your git repository run:
 
 ```bash
+# Go:
 territory upload --repo-id $YOUR_REPOSITORY_ID -l go
+
+# Python:
+territory upload --repo-id $YOUR_REPOSITORY_ID -l python
 ```
 We will scan the repo for modules, package parse results and send the code
 for indexing.
