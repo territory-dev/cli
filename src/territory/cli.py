@@ -45,7 +45,7 @@ class Package:
 def upload(args, cwd):
     upload_token = None
     if not args.tarball_only:
-        upload_token = auth(args)
+        upload_token = auth(args.upload_token_path)
 
     repo_root = find_repo_root(cwd).resolve()
     print('repository root directory:', repo_root)
@@ -119,6 +119,10 @@ def upload(args, cwd):
         print(f'Indexing will begin shortly. You can track build status at <https://app.territory.dev/repos/{args.repo_id}/jobs>.')
 
 
+def authenticate(args, cwd):
+    auth(args.upload_token_path, force_acquire=True)
+
+
 parser = ArgumentParser()
 parser.add_argument('-C', type=Path, help='execute in a directory', metavar='PARSEDIR')
 parser.add_argument('-L', action='store_true', help='enable debug logging')
@@ -142,3 +146,10 @@ repo_or_tarball.add_argument(
     '--tarball-only',
     action='store_true',
     help='do not upload, create territory_upload.tar.gz output only')
+
+sp = subparsers.add_parser('authenticate')
+sp.set_defaults(func=authenticate)
+sp.add_argument(
+    '--upload-token-path',
+    type=Path,
+    default=DEFAULT_UPLOAD_TOKEN_PATH)

@@ -1,3 +1,4 @@
+from pathlib import Path
 from shutil import copyfileobj
 from socket import gethostname
 from sys import exit
@@ -74,9 +75,8 @@ def open_authorizer(params):
     webbrowser.open(url)
 
 
-def auth(args):
-    token_path = args.upload_token_path
-    if token_path.is_file():
+def auth(token_path: Path, force_acquire=False):
+    if not force_acquire and token_path.is_file():
         print(f'reading token from {token_path}')
         return token_path.read_text().strip()
     else:
