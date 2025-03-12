@@ -57,6 +57,8 @@ def upload(args, cwd):
     else:
         lang = c.Lang()
 
+    jobs_page_url = None
+
     with TemporaryDirectory() as td:
         td = Path(td)
         captured_files: set[Path] = set()
@@ -109,14 +111,15 @@ def upload(args, cwd):
         blob_size = tarball_path.stat().st_size
         intent = create_build_request(
             upload_token, args.repo_id, branch, meta, blob_size)
+        jobs_page_url = intent.get('jobsPageUrl')
 
         print('uploading')
         with tarball_path.open('rb') as f:
             resp = requests.put(intent['url'], data=f, headers=intent['extensionHeaders'])
         resp.raise_for_status()
 
-    if args.repo_id:
-        print(f'Indexing will begin shortly. You can track build status at <https://app.territory.dev/repos/{args.repo_id}/jobs>.')
+    if jobs_page_url:
+        print(f'Indexing will begin shortly. You can track build status at <{jobs_page_url}>.')
 
 
 def authenticate(args, cwd):
